@@ -69,6 +69,10 @@ struct FSDState {
 
     // ── Precondition trigger ──────────────────────────────────────────────────
     bool           precondition;     // periodically inject 0x082
+
+    // ── TLSSC Restore (0x331 DAS config spoof) ──────────────────────────────
+    bool           tlssc_restore;
+    uint32_t       tlssc_restore_count;
 };
 
 // ── API ───────────────────────────────────────────────────────────────────────
@@ -119,3 +123,8 @@ void fsd_handle_bms_thermal(FSDState *state, const CanFrame *frame);
 
 /** Build a UI_tripPlanning (0x082) frame to trigger active battery heating. */
 void fsd_build_precondition_frame(CanFrame *frame);
+
+/** Handle CAN ID 0x331 — TLSSC Restore via DAS config spoof.
+ *  Overwrites byte[0] lower 6 bits to 0x1B (SELF_DRIVING).
+ *  Returns true if frame was modified and should be re-sent. */
+bool fsd_handle_tlssc_restore(FSDState *state, CanFrame *frame);

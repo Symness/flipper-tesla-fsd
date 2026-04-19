@@ -350,3 +350,19 @@ void fsd_build_precondition_frame(CanFrame *frame) {
     // byte0: bit0 = tripPlanningActive, bit2 = requestActiveBatteryHeating
     frame->data[0] = 0x05u;
 }
+
+// ── TLSSC Restore (0x331) ─────────────────────────────────────────────────────
+
+bool fsd_handle_tlssc_restore(FSDState *state, CanFrame *frame) {
+    if (!state->tlssc_restore) return false;
+    if (frame->dlc < 1) return false;
+
+    uint8_t original = frame->data[0];
+    uint8_t modified = (original & 0xC0u) | 0x1Bu;
+
+    if (modified == original) return false;
+
+    frame->data[0] = modified;
+    state->tlssc_restore_count++;
+    return true;
+}

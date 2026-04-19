@@ -219,6 +219,14 @@ static void process_frame(const CanFrame &frame) {
         return;
     }
 
+    // TLSSC Restore (0x331) — DAS config spoof
+    if (frame.id == CAN_ID_DAS_AP_CONFIG) {
+        CanFrame f = frame;
+        if (fsd_handle_tlssc_restore(&g_state, &f) && tx)
+            g_can->send(f);
+        return;
+    }
+
     // HW3/HW4 autopilot control (0x3FD) — main FSD activation frame
     if (frame.id == CAN_ID_AP_CONTROL) {
         CanFrame f = frame;

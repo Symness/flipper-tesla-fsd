@@ -13,6 +13,7 @@
 #define CAN_ID_AP_LEGACY      0x3EEu  // 1006 - DAS_autopilot:   Legacy / HW1 / HW2
 #define CAN_ID_FOLLOW_DIST    0x3F8u  // 1016 - DAS_followDistance: speed profile source
 #define CAN_ID_AP_CONTROL     0x3FDu  // 1021 - DAS_autopilotControl: HW3 / HW4 core
+#define CAN_ID_GTW_CONFIG_ETH 0x7FFu  // 2047 - GTW_carConfig extended: Ban Shield target
 
 // ── GPIO — M5Stack ATOM Lite + ATOMIC CAN Base (CA-IS3050G) ──────────────────
 #ifndef PIN_CAN_TX

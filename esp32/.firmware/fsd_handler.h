@@ -69,6 +69,15 @@ struct FSDState {
 
     // ── Precondition trigger ──────────────────────────────────────────────────
     bool           precondition;     // periodically inject 0x082
+
+    // ── Ban Shield (GTW_carConfig 0x7FF) ──────────────────────────────────────
+    bool           ban_shield;              // feature enabled
+    bool           ban_shield_armed;        // all 8 mux frames learned → active
+    uint8_t        ban_shield_snapshot[8][8]; // healthy baseline per mux index
+    bool           ban_shield_snapshot_valid[8]; // true when mux[i] captured
+    uint8_t        ban_shield_learned;      // count of learned mux frames (0-8)
+    uint32_t       ban_shield_blocks;       // overwrite counter
+    uint32_t       seen_gtw_config_eth;     // 0x7FF seen count
 };
 
 // ── API ───────────────────────────────────────────────────────────────────────
@@ -119,3 +128,9 @@ void fsd_handle_bms_thermal(FSDState *state, const CanFrame *frame);
 
 /** Build a UI_tripPlanning (0x082) frame to trigger active battery heating. */
 void fsd_build_precondition_frame(CanFrame *frame);
+
+/** Ban Shield: monitor GTW_carConfig (0x7FF) mux frames.
+ *  During learning, captures the healthy baseline for each of the 8 mux IDs.
+ *  When armed, overwrites any change with the healthy snapshot.
+ *  Returns true if frame was overwritten and should be re-sent. */
+bool fsd_handle_ban_shield(FSDState *state, CanFrame *frame);

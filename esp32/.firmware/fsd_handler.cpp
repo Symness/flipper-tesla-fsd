@@ -350,3 +350,61 @@ void fsd_build_precondition_frame(CanFrame *frame) {
     // byte0: bit0 = tripPlanningActive, bit2 = requestActiveBatteryHeating
     frame->data[0] = 0x05u;
 }
+
+// ── Ban Shield (GTW_carConfig 0x7FF) ──────────────────────────────────────────
+//
+// The Gateway broadcasts 8 multiplexed frames on 0x7FF (mux ID = lower 3 bits
+// of byte 0).  When Tesla pushes a VIN ban, specific bits change in these frames
+// to disable TLSSC/FSD.
+//
+// Learning phase (ban_shield ON, ban_shield_armed OFF):
+//   Capture each mux frame the first time it appears → "healthy" snapshot.
+//   Once all 8 mux frames are captured, the shield auto-arms.
+//
+// Armed phase:
+//   Compare every incoming 0x7FF against its snapshot.  If any byte differs,
+//   overwrite the frame data with the healthy snapshot and return true so the
+//   caller retransmits the healthy version on the bus.
+
+bool fsd_handle_ban_shield(FSDState *state, CanFrame *frame) {
+    if (frame->dlc < 8) return false;
+    if (!state->ban_shield) return false;
+
+    uint8_t mux = frame->data[0] & 0x07;
+
+    // ── Learning phase ────────────────────────────────────────────────────────
+    if (!state->ban_shield_armed) {
+        if (!state->ban_shield_snapshot_valid[mux]) {
+            for (int i = 0; i < 8; i++)
+                state->ban_shield_snapshot[mux][i] = frame->data[i];
+            state->ban_shield_snapshot_valid[mux] = true;
+            state->ban_shield_learned++;
+
+            // Auto-arm once all 8 mux frames have been captured
+            if (state->ban_shield_learned >= 8) {
+                state->ban_shield_armed = true;
+            }
+        }
+        return false;
+    }
+
+    // ── Armed phase ───────────────────────────────────────────────────────────
+    if (!state->ban_shield_snapshot_valid[mux]) return false;
+
+    bool changed = false;
+    for (int i = 0; i < 8; i++) {
+        if (frame->data[i] != state->ban_shield_snapshot[mux][i]) {
+            changed = true;
+            break;
+        }
+    }
+
+    if (changed) {
+        for (int i = 0; i < 8; i++)
+            frame->data[i] = state->ban_shield_snapshot[mux][i];
+        state->ban_shield_blocks++;
+        return true;
+    }
+
+    return false;
+}

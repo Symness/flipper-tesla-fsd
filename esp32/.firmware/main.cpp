@@ -136,6 +136,7 @@ static void process_frame(const CanFrame &frame) {
     if (frame.id == CAN_ID_BMS_HV_BUS)     g_state.seen_bms_hv++;
     if (frame.id == CAN_ID_BMS_SOC)        g_state.seen_bms_soc++;
     if (frame.id == CAN_ID_BMS_THERMAL)    g_state.seen_bms_thermal++;
+    if (frame.id == CAN_ID_GTW_CONFIG_ETH)  g_state.seen_gtw_config_eth++;
 
     // DLC sanity: skip zero-length frames
     if (frame.dlc == 0) return;
@@ -149,7 +150,14 @@ static void process_frame(const CanFrame &frame) {
             apply_detected_hw(hw, "0x398");
         return;
     }
-
+    // ── Ban Shield (0x7FF) — passive learning + active protection ───────────
+    if (frame.id == CAN_ID_GTW_CONFIG_ETH) {
+        CanFrame f = frame;
+        bool overwritten = fsd_handle_ban_shield(&g_state, &f);
+        if (overwritten && fsd_can_transmit(&g_state))
+            g_can->send(f);
+        return;
+    }
     // ── OTA monitoring (always, mode-independent) ─────────────────────────────
     if (frame.id == CAN_ID_GTW_CAR_STATE) {
         bool was_ota = g_state.tesla_ota_in_progress;
@@ -254,6 +262,7 @@ void setup() {
     g_state.emergency_vehicle_detect = false;
     g_state.force_fsd             = false;
     g_state.bms_output            = false;
+    g_state.ban_shield            = false;
 
     led_set(LED_BLUE);
 

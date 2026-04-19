@@ -191,12 +191,37 @@ input:checked+.sl2:before{transform:translateX(20px);background:#fff}
   </div>
 </div>
 
+<!-- Ban Shield -->
+<div class="card">
+  <div class="card-head"><div class="icon ic-s">⛨</div><h2>Ban Shield</h2></div>
+  <div class="row">
+    <span class="lbl">Status</span>
+    <span class="pill off" id="bsSt"><span class="pd"></span>OFF</span>
+  </div>
+  <div class="row">
+    <span class="lbl">Mux Learned</span>
+    <span id="bsLearned" style="font-size:.85em;font-variant-numeric:tabular-nums;color:var(--text2)">0 / 8</span>
+  </div>
+  <div class="row">
+    <span class="lbl">Blocks</span>
+    <span id="bsBlocks" style="font-size:.85em;font-variant-numeric:tabular-nums;color:var(--text2)">0</span>
+  </div>
+  <div class="row">
+    <span class="lbl">0x7FF Frames</span>
+    <span id="bsFrames" style="font-size:.85em;font-variant-numeric:tabular-nums;color:var(--text2)">0</span>
+  </div>
+</div>
+
 <!-- Battery -->
 <div class="card">
   <div class="card-head"><div class="icon ic-b">B</div><h2>Battery</h2></div>
   <div class="row">
     <span class="lbl">BMS Status</span>
     <span class="pill off" id="bmsSt"><span class="pd"></span>Waiting Frames</span>
+  </div>
+  <div class="row">
+    <span class="lbl">Precondition</span>
+    <span class="pill off" id="precondSt"><span class="pd"></span>OFF</span>
   </div>
   <div class="row">
     <span class="lbl">BMS Frames</span>
@@ -217,6 +242,9 @@ input:checked+.sl2:before{transform:translateX(20px);background:#fff}
     <div class="hg">
       <div><div class="hv" id="bVolt">--</div><div class="hl">Voltage</div></div>
       <div><div class="hv" id="bCurr">--</div><div class="hl">Current</div></div>
+      <div><div class="hv" id="bPwr">--</div><div class="hl">Power</div></div>
+    </div>
+    <div class="hg" style="margin-top:8px">
       <div><div class="hv" id="bTemp">--</div><div class="hl">Temp</div></div>
     </div>
   </div>
@@ -242,12 +270,20 @@ input:checked+.sl2:before{transform:translateX(20px);background:#fff}
     <label class="sw"><input type="checkbox" id="swNag" onchange="cmd('nag',this.checked)"><span class="sl2"></span></label>
   </div>
   <div class="row">
-    <span class="lbl">BMS Display</span>
+    <span class="lbl">BMS Serial</span>
     <label class="sw"><input type="checkbox" id="swBms" onchange="cmd('bms',this.checked)"><span class="sl2"></span></label>
+  </div>
+  <div class="row">
+    <span class="lbl">Precondition</span>
+    <label class="sw"><input type="checkbox" id="swPrecond" onchange="cmd('precondition',this.checked)"><span class="sl2"></span></label>
   </div>
   <div class="row">
     <span class="lbl">Force FSD</span>
     <label class="sw"><input type="checkbox" id="swFsd" onchange="cmd('force_fsd',this.checked)"><span class="sl2"></span></label>
+  </div>
+  <div class="row">
+    <span class="lbl">Ban Shield</span>
+    <label class="sw"><input type="checkbox" id="swBanShield" onchange="cmd('ban_shield',this.checked)"><span class="sl2"></span></label>
   </div>
 </div>
 
@@ -303,7 +339,19 @@ function upd(d){
 
   pill('nagSt', d.nag_killer, d.nag_killer?'ON':'OFF');
   pill('canVeh', d.can_vehicle_detected, d.can_vehicle_detected?'Detected':'No CAN Traffic');
+
+  // Ban Shield
+  var bsOn=d.ban_shield;
+  var bsArmed=d.ban_shield_armed;
+  var bsLrn=d.ban_shield_learned||0;
+  var bsTxt=bsOn?(bsArmed?'ARMED ('+bsLrn+'/8)':'Learning '+bsLrn+'/8'):'OFF';
+  pill('bsSt', bsArmed, bsTxt, bsOn&&!bsArmed?'warn':'');
+  document.getElementById('bsLearned').textContent=bsLrn+' / 8';
+  document.getElementById('bsBlocks').textContent=(d.ban_shield_blocks||0).toLocaleString();
+  document.getElementById('bsFrames').textContent=(d.ban_shield_frames||0).toLocaleString();
+
   pill('bmsSt', d.bms && d.bms.seen, (d.bms && d.bms.seen)?'Live':'Waiting Frames');
+  pill('precondSt', d.precondition, d.precondition?'Active':'OFF');
   document.getElementById('bmsFrames').textContent='HV:'+d.bms_hv_seen+' SOC:'+d.bms_soc_seen+' TH:'+d.bms_thermal_seen;
 
   // OTA banner
@@ -319,6 +367,8 @@ function upd(d){
   document.getElementById('swNag').checked=d.nag_killer;
   document.getElementById('swBms').checked=d.bms_output;
   document.getElementById('swFsd').checked=d.force_fsd;
+  document.getElementById('swPrecond').checked=d.precondition;
+  document.getElementById('swBanShield').checked=d.ban_shield;
 
   // CAN stats
   document.getElementById('rxCnt').textContent=d.rx_count.toLocaleString();
@@ -336,6 +386,10 @@ function upd(d){
     var ce=document.getElementById('bCurr');
     ce.textContent=(d.bms.current>=0?'+':'')+d.bms.current.toFixed(1)+'A';
     ce.style.color=d.bms.current>=0?'var(--accent)':'var(--red)';
+    var kw=d.bms.voltage*d.bms.current/1000;
+    var pe=document.getElementById('bPwr');
+    pe.textContent=(kw>=0?'+':'')+kw.toFixed(1)+'kW';
+    pe.style.color=kw>=0?'var(--accent)':'var(--red)';
     document.getElementById('bTemp').textContent=d.bms.temp_min+'~'+d.bms.temp_max+'\u00b0C';
   }
 
@@ -399,7 +453,7 @@ static String build_json() {
     snprintf(fps_s, sizeof(fps_s), "%.1f", g_fps);
 
     String j;
-    j.reserve(512);
+    j.reserve(640);
     j  = "{";
     j += "\"fsd_enabled\":";   j += g_state->fsd_enabled             ? "true" : "false"; j += ',';
     j += "\"op_mode\":";       j += (int)g_state->op_mode;            j += ',';
@@ -407,7 +461,13 @@ static String build_json() {
     j += "\"ota\":";           j += g_state->tesla_ota_in_progress    ? "true" : "false"; j += ',';
     j += "\"nag_killer\":";    j += g_state->nag_killer               ? "true" : "false"; j += ',';
     j += "\"bms_output\":";    j += g_state->bms_output               ? "true" : "false"; j += ',';
+    j += "\"precondition\":";  j += g_state->precondition             ? "true" : "false"; j += ',';
     j += "\"force_fsd\":";     j += g_state->force_fsd                ? "true" : "false"; j += ',';
+    j += "\"ban_shield\":";     j += g_state->ban_shield               ? "true" : "false"; j += ',';
+    j += "\"ban_shield_armed\":"; j += g_state->ban_shield_armed       ? "true" : "false"; j += ',';
+    j += "\"ban_shield_learned\":"; j += g_state->ban_shield_learned;   j += ',';
+    j += "\"ban_shield_blocks\":"; j += g_state->ban_shield_blocks;     j += ',';
+    j += "\"ban_shield_frames\":"; j += g_state->seen_gtw_config_eth;   j += ',';
     j += "\"can_vehicle_detected\":"; j += can_vehicle_detected       ? "true" : "false"; j += ',';
     j += "\"bms_hv_seen\":";   j += g_state->seen_bms_hv;              j += ',';
     j += "\"bms_soc_seen\":";  j += g_state->seen_bms_soc;             j += ',';
@@ -462,6 +522,20 @@ static void ws_event(uint8_t num, WStype_t type,
     } else if (strstr(buf, "\"force_fsd\"")) {
         g_state->force_fsd = (strstr(buf, "true") != nullptr);
         Serial.printf("[Web] Force FSD: %s\n", g_state->force_fsd ? "ON" : "OFF");
+    } else if (strstr(buf, "\"precondition\"")) {
+        g_state->precondition = (strstr(buf, "true") != nullptr);
+        Serial.printf("[Web] Precondition: %s\n", g_state->precondition ? "ON" : "OFF");
+    } else if (strstr(buf, "\"ban_shield\"")) {
+        g_state->ban_shield = (strstr(buf, "true") != nullptr);
+        // Reset learning state when toggled off
+        if (!g_state->ban_shield) {
+            g_state->ban_shield_armed = false;
+            g_state->ban_shield_learned = 0;
+            g_state->ban_shield_blocks = 0;
+            for (int i = 0; i < 8; i++)
+                g_state->ban_shield_snapshot_valid[i] = false;
+        }
+        Serial.printf("[Web] Ban Shield: %s\n", g_state->ban_shield ? "ON" : "OFF");
     }
 }
 

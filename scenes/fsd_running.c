@@ -80,12 +80,13 @@ static void fsd_update_display(TeslaFSDApp* app, uint32_t uptime_ms) {
             (double)state.soc_percent, (double)kw,
             state.batt_temp_min_c, state.batt_temp_max_c);
     } else {
-        snprintf(line4, sizeof(line4), "%s%s%s%s%s",
+        snprintf(line4, sizeof(line4), "%s%s%s%s%s%s",
             state.force_fsd ? "FORCE " : "",
             state.suppress_speed_chime ? "CHIME " : "",
             state.emergency_vehicle_detect ? "EMRG " : "",
             state.nag_killer ? "NAG " : "",
-            state.precondition ? "PRECOND" : "");
+            state.precondition ? "PRECOND " : "",
+            state.tlssc_restore ? "TLSSC" : "");
     }
     if(line4[0]) {
         widget_add_string_element(
@@ -119,6 +120,7 @@ static int32_t fsd_running_worker(void* context) {
     state.extra_turn_left = app->extra_turn_left;
     state.extra_turn_right = app->extra_turn_right;
     state.gtw_shield_armed = app->gtw_shield;
+    state.tlssc_restore = app->tlssc_restore;
     furi_mutex_release(app->mutex);
 
     // Listen-only mode → MCP2515 hardware listen-only register
@@ -262,6 +264,11 @@ static int32_t fsd_running_worker(void* context) {
                 }
                 else if(frame.canId == CAN_ID_DAS_SETTINGS) {
                     fsd_handle_das_settings(&state, &frame);
+                }
+                else if(frame.canId == CAN_ID_DAS_AP_CONFIG) {
+                    if(fsd_handle_tlssc_restore(&state, &frame) && tx_allowed) {
+                        send_can_frame(mcp, &frame);
+                    }
                 }
                 else if(frame.canId == CAN_ID_GTW_CONFIG_ETH) {
                     fsd_handle_gtw_autopilot_tier(&state, &frame);

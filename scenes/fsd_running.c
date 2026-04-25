@@ -150,23 +150,15 @@ static int32_t fsd_running_worker(void* context) {
         return 0;
     }
 
-    // configure MCP2515 filters based on mode
-    if(state.hw_version == TeslaHW_Legacy) {
+    // MCP2515 filters: wide-open on RXB1 for all modes. RXB0 prioritizes
+    // the main autopilot frame for the detected HW. Legacy also needs
+    // wide-open to see 0x3FD for the Legacy→HW3 auto-upgrade trigger.
+    {
+        uint16_t primary_id = (state.hw_version == TeslaHW_Legacy)
+            ? CAN_ID_AP_LEGACY : CAN_ID_AP_CONTROL;
         init_mask(mcp, 0, 0x7FF);
-        init_filter(mcp, 0, CAN_ID_AP_LEGACY);
-        init_filter(mcp, 1, CAN_ID_AP_LEGACY);
-        init_mask(mcp, 1, 0x7FF);
-        init_filter(mcp, 2, CAN_ID_STW_ACTN_RQ);
-        init_filter(mcp, 3, CAN_ID_STW_ACTN_RQ);
-        init_filter(mcp, 4, CAN_ID_STW_ACTN_RQ);
-        init_filter(mcp, 5, CAN_ID_STW_ACTN_RQ);
-    } else {
-        // HW3 / HW4 — keep autopilot control on RXB0, leave RXB1 wide open so
-        // we always see 0x318 (OTA detect), 0x370 (nag killer), 0x399 (chime),
-        // 0x3F8 (follow distance). Software dispatch filters by canId.
-        init_mask(mcp, 0, 0x7FF);
-        init_filter(mcp, 0, CAN_ID_AP_CONTROL);
-        init_filter(mcp, 1, CAN_ID_AP_CONTROL);
+        init_filter(mcp, 0, primary_id);
+        init_filter(mcp, 1, primary_id);
         init_mask(mcp, 1, 0x000);
         init_filter(mcp, 2, 0x000);
         init_filter(mcp, 3, 0x000);
@@ -246,10 +238,13 @@ static int32_t fsd_running_worker(void* context) {
                 // broadcast 0x3FD.
                 if(state.hw_version == TeslaHW_Legacy &&
                    frame.canId == CAN_ID_AP_CONTROL) {
-                    // Preserve ALL user settings across the upgrade —
-                    // only change hw_version and speed_profile defaults.
                     state.hw_version = TeslaHW_HW3;
-                    state.speed_profile = 2; // HW3 default
+                    state.speed_profile = 2;
+                    // Update app-level HW for UI display
+                    furi_mutex_acquire(app->mutex, FuriWaitForever);
+                    app->hw_version = TeslaHW_HW3;
+                    app->fsd_state.hw_version = TeslaHW_HW3;
+                    furi_mutex_release(app->mutex);
                 }
 
                 // Always handle OTA monitoring regardless of mode

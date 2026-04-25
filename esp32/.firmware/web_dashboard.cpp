@@ -643,7 +643,8 @@ static void ws_event(uint8_t num, WStype_t type,
                 if (end) {
                     int len = end - p;
                     if (len > 64) len = 64;
-                    if (memchr(p, '\\', len) == nullptr) {
+                    if (memchr(p, '\\', len) == nullptr &&
+                        !(len == 3 && memcmp(p, "***", 3) == 0)) {
                         memcpy(g_state->wifi_pass, p, len);
                         g_state->wifi_pass[len] = '\0';
                     }

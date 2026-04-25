@@ -246,13 +246,10 @@ static int32_t fsd_running_worker(void* context) {
                 // broadcast 0x3FD.
                 if(state.hw_version == TeslaHW_Legacy &&
                    frame.canId == CAN_ID_AP_CONTROL) {
+                    // Preserve ALL user settings across the upgrade —
+                    // only change hw_version and speed_profile defaults.
                     state.hw_version = TeslaHW_HW3;
-                    fsd_state_init(&state, TeslaHW_HW3);
-                    state.force_fsd = app->force_fsd;
-                    state.suppress_speed_chime = app->suppress_speed_chime;
-                    state.nag_killer = app->nag_killer;
-                    state.op_mode = app->op_mode;
-                    state.tlssc_restore = app->tlssc_restore;
+                    state.speed_profile = 2; // HW3 default
                 }
 
                 // Always handle OTA monitoring regardless of mode
@@ -301,12 +298,14 @@ static int32_t fsd_running_worker(void* context) {
                 }
                 else if(frame.canId == CAN_ID_GTW_CONFIG_ETH) {
                     fsd_handle_gtw_autopilot_tier(&state, &frame);
+                    // Shield and tier override are mutually exclusive on the
+                    // same frame — shield freezes existing state, override
+                    // forces tier=3. Don't send two conflicting copies.
                     if(shield_enabled) {
                         if(fsd_handle_gtw_shield(&state, &frame) && tx_allowed) {
                             send_can_frame(mcp, &frame);
                         }
-                    }
-                    if(fsd_handle_gtw_tier_override(&state, &frame) && tx_allowed) {
+                    } else if(fsd_handle_gtw_tier_override(&state, &frame) && tx_allowed) {
                         send_can_frame(mcp, &frame);
                     }
                 }

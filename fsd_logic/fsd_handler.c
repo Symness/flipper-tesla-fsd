@@ -12,6 +12,7 @@ void fsd_state_init(FSDState* state, TeslaHWVersion hw) {
         state->speed_profile = 2;
     state->op_mode = OpMode_Active;
     state->gtw_autopilot_tier = -1;
+    state->das_hands_on_state = 0xFF; // unseen — nag killer echoes conservatively
     state->enhanced_autopilot = false;
     state->speed_profile_locked = false;
     state->hw4_offset = 0;
@@ -142,7 +143,7 @@ bool fsd_handle_autopilot_frame(FSDState* state, CANFRAME* frame) {
     if(mux == 0) state->fsd_enabled = fsd_ui;
 
     // bit38 explicit TLSSC enable on mux=0 (complementary to 0x331)
-    if(mux == 0 && state->assist_tlssc_bit38) {
+    if(mux == 0 && state->assist_tlssc_bit38 && state->fsd_enabled) {
         fsd_set_bit(frame, 38, true);
         modified = true;
     }
